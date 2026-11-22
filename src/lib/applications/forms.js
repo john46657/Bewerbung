@@ -42,6 +42,7 @@ function validateType(type) {
   if (!/^[a-z0-9_-]{2,24}$/.test(type.id)) problems.push(`Schlüssel „${type.id}“ muss 2–24 Zeichen a-z, 0-9, _ oder - haben`);
   if (!['apply', 'quali'].includes(type.panel)) problems.push(`${type.id}: panel muss "apply" oder "quali" sein`);
   if (!['police', 'simple'].includes(type.workflow)) problems.push(`${type.id}: workflow muss "police" oder "simple" sein`);
+  if (!['DM', 'DM_WEB'].includes(type.mode ?? 'DM')) problems.push(`${type.id}: mode muss "DM" oder "DM_WEB" sein`);
   if (!['NONE', 'DENY', 'WITHDRAW'].includes(type.onLeave)) problems.push(`${type.id}: onLeave muss NONE, DENY oder WITHDRAW sein`);
   if (type.timeLimitMinutes < 5 || type.timeLimitMinutes > 10_080) problems.push(`${type.id}: timeLimitMinutes muss zwischen 5 und 10080 liegen`);
   if (!type.questions.length) problems.push(`${type.id}: keine Fragen`);

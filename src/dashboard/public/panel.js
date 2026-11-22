@@ -82,8 +82,15 @@
           )
         : el('p', { class: 'hint', text: 'Du hast noch keine Bewerbungen. Lege zuerst unter „Bewerbungen“ eine an.' }),
     );
-    buttonField.hidden = linked.length !== 1;
-    placeholderField.hidden = linked.length < 2;
+    const kind = display(linked.length);
+    buttonField.hidden = !(kind === 'buttons' && linked.length === 1);
+    placeholderField.hidden = kind !== 'menu';
+  }
+  // Gleiche Regel wie im Bot: auto = 1 Bewerbung Button, mehrere Auswahlmenü
+  function display(count) {
+    if (!count) return 'none';
+    if (state.style === 'buttons' || state.style === 'menu') return state.style;
+    return count === 1 ? 'buttons' : 'menu';
   }
   function swap(i, delta) {
     [state.types[i], state.types[i + delta]] = [state.types[i + delta], state.types[i]];
@@ -95,11 +102,20 @@
   const preview = el('div', { class: 'dc-message' });
   function drawPreview() {
     const linked = state.types.map((id) => types.find((t) => t.id === id)).filter(Boolean);
+    const kind = display(linked.length);
     const container = el('div', { class: 'dc-container' });
     container.style.borderLeftColor = /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : defaultColor;
-    container.append(el('h3', { class: 'dc-title', text: state.title || 'Titel' }));
-    if (state.description) container.append(el('div', { class: 'dc-text' }, markdown(state.description)));
-    if (linked.length !== 1) {
+    const head = el('div', { class: 'dc-head' });
+    if (state.author) head.append(el('div', { class: 'dc-small dc-strong', text: state.author }));
+    head.append(el('h3', { class: 'dc-title', text: state.title || 'Titel' }));
+    if (state.description) head.append(el('div', { class: 'dc-text' }, markdown(state.description)));
+    if (/^https:\/\/\S+$/.test(state.thumbnail)) {
+      const thumb = el('img', { class: 'dc-thumb', alt: '' });
+      thumb.addEventListener('error', () => thumb.remove());
+      thumb.src = state.thumbnail;
+      container.append(el('div', { class: 'dc-section' }, head, thumb));
+    } else container.append(head);
+    if (linked.length > 1 || !linked.length) {
       container.append(el('hr', { class: 'dc-sep' }));
       if (linked.length) {
         container.append(
@@ -118,15 +134,26 @@
       img.src = state.image;
       container.append(img);
     }
+    if (state.footer) container.append(el('div', { class: 'dc-small', text: state.footer }));
     const parts = [el('div', { class: 'dc-author' }, el('span', { class: 'dc-bot', text: 'BOT' }), el('strong', { text: serverName })), container];
-    if (linked.length === 1) parts.push(el('div', { class: 'dc-button' }, `${linked[0].emoji} `, state.buttonLabel || 'Jetzt bewerben'));
-    if (linked.length > 1) parts.push(el('div', { class: 'dc-select' }, el('span', { text: state.placeholder || 'Wofür möchtest du dich bewerben?' }), el('span', { text: '⌄' })));
+    if (kind === 'buttons') {
+      parts.push(
+        el(
+          'div',
+          { class: 'dc-buttons' },
+          linked.length === 1
+            ? el('div', { class: 'dc-button' }, `${linked[0].emoji} `, state.buttonLabel || 'Jetzt bewerben')
+            : linked.map((t) => el('div', { class: `dc-button${t.enabled ? '' : ' dc-button-grey'}` }, `${t.emoji} `, t.name)),
+        ),
+      );
+    }
+    if (kind === 'menu') parts.push(el('div', { class: 'dc-select' }, el('span', { text: state.placeholder || 'Wofür möchtest du dich bewerben?' }), el('span', { text: '⌄' })));
     preview.replaceChildren(...parts);
   }
 
   // ---------- Formular ----------
-  const buttonField = field('Button-Text', input('buttonLabel', { maxlength: 80, placeholder: 'Jetzt bewerben' }), 'Bei genau einer Bewerbung zeigt das Panel einen Button.');
-  const placeholderField = field('Text im Auswahlmenü', input('placeholder', { maxlength: 150, placeholder: 'Wofür möchtest du dich bewerben?' }), 'Bei mehreren Bewerbungen zeigt das Panel ein Auswahlmenü.');
+  const buttonField = field('Button-Text', input('buttonLabel', { maxlength: 80, placeholder: 'Jetzt bewerben' }), 'Text auf dem Button.');
+  const placeholderField = field('Text im Auswahlmenü', input('placeholder', { maxlength: 150, placeholder: 'Wofür möchtest du dich bewerben?' }), 'Steht im Menü, bevor man etwas auswählt.');
   const errorsBox = el('div', { class: 'notice notice-bad', hidden: true });
   const saveButton = el('button', { type: 'button', class: 'btn', text: 'Speichern', onclick: () => save(false) });
   const sendButton = el('button', { type: 'button', class: 'btn btn-primary', text: 'In Kanal senden', onclick: () => save(true) });
@@ -150,10 +177,37 @@
           field('Name (nur im Dashboard)', input('name', { maxlength: 80, placeholder: 'z. B. Hauptpanel' })),
           field('Titel', input('title', { maxlength: 200 })),
           field('Text', el('textarea', { rows: 5, maxlength: 3000, value: state.description, oninput: (e) => ((state.description = e.target.value), update()) }), '**fett**, *kursiv* und Zeilenumbrüche funktionieren wie in Discord.'),
-          field('Bild-URL (optional)', input('image', { type: 'url', maxlength: 500, placeholder: 'https://…' })),
+          field('Bild-URL (optional)', input('image', { type: 'url', maxlength: 500, placeholder: 'https://…' }), 'Großes Bild unten im Panel'),
+          el(
+            'details',
+            { class: 'q-more', open: Boolean(state.author || state.thumbnail || state.footer) },
+            el('summary', { text: 'Mehr: Kopfzeile, Vorschaubild, Fußzeile' }),
+            field('Kopfzeile (klein über dem Titel)', input('author', { maxlength: 100, placeholder: 'z. B. ENRP Personalabteilung' })),
+            field('Vorschaubild-URL', input('thumbnail', { type: 'url', maxlength: 500, placeholder: 'https://… (z. B. Logo)' }), 'Kleines Bild rechts neben dem Titel'),
+            field('Fußzeile', input('footer', { maxlength: 200, placeholder: 'z. B. Bewerbungen werden innerhalb von 48 Stunden bearbeitet.' })),
+          ),
           el('div', { class: 'row' }, field('Farbstreifen', colorInput), el('div', { class: 'field field-check' }, el('button', { type: 'button', class: 'btn btn-sm btn-ghost', text: 'Zurück auf Standard', onclick: () => ((state.color = ''), (colorInput.value = defaultColor), update()) }))),
         ),
-        step(2, 'Bewerbungen', 'Welche Bewerbungen man über dieses Panel starten kann. Die Reihenfolge hier ist die Reihenfolge im Panel.', linkedWrap, buttonField, placeholderField),
+        step(
+          2,
+          'Bewerbungen',
+          'Welche Bewerbungen man über dieses Panel starten kann. Die Reihenfolge hier ist die Reihenfolge im Panel.',
+          linkedWrap,
+          field(
+            'Darstellung',
+            el(
+              'select',
+              { onchange: (e) => ((state.style = e.target.value), update(), drawLinked()) },
+              [
+                ['auto', 'Automatisch (eine Bewerbung = Button, mehrere = Auswahlmenü)'],
+                ['menu', 'Auswahlmenü'],
+                ['buttons', 'Ein Button pro Bewerbung'],
+              ].map(([v, t]) => el('option', { value: v, text: t, selected: (state.style || 'auto') === v })),
+            ),
+          ),
+          buttonField,
+          placeholderField,
+        ),
         step(
           3,
           'Senden',

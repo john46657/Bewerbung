@@ -9,8 +9,8 @@ keine Datenbank und keinen zweiten Prozess.
 | Bereich | Inhalt | Wer |
 |---|---|---|
 | **Übersicht** | offene Bewerbungen, Kennzahlen der letzten 30 Tage, nächste Schritte beim Einrichten | alle mit Zugriff |
-| **Bewerbungen** | Bewerbungen anlegen, bearbeiten, löschen: Name, Emoji, Fragen (Freitext, Auswahl, Rollen-Auswahl, Roblox), Texte, Rollen, Kanäle, Wartezeit, Zeitlimit; Standard-Kanal für eingehende Bewerbungen | „Server verwalten“ |
-| **Panels** | beliebig viele Panels: verknüpfte Bewerbungen (mit Reihenfolge), Titel, Text, Bild, Farbe, Button-/Menütext, Live-Vorschau, **in einen Kanal senden** | „Server verwalten“ |
+| **Bewerbungen** | Bewerbungen anlegen, bearbeiten, löschen: Name, Emoji, Fragen (Freitext, Auswahl, Rollen-Auswahl, Roblox; duplizieren, sortieren), Texte, Rollen, Kanäle, Wartezeit und Zeitlimit (Tage/Std./Min.), Team-Thread, Statistik an/aus, Antworten verstecken, **Ausfüllen per DM oder auch auf der Website** (mit Link zum Teilen); Standard-Kanal für eingehende Bewerbungen | „Server verwalten“ |
+| **Panels** | beliebig viele Panels: verknüpfte Bewerbungen (mit Reihenfolge), Darstellung (automatisch, Auswahlmenü oder ein Button pro Bewerbung), Titel, Text, Kopfzeile, Vorschaubild, großes Bild, Fußzeile, Farbe, Button-/Menütext, Live-Vorschau, **in einen Kanal senden** | „Server verwalten“ |
 | **Eingänge** | eingegangene Bewerbungen filtern und durchsuchen, alle Antworten, KI-Checker, Verlauf; **annehmen / ablehnen mit Grund**, Prüfschritte | Staff und Manager-Rollen der jeweiligen Bewerbung |
 
 Entscheidungen im Dashboard wirken genauso wie die Buttons in Discord: DM an die Person, Rollen werden vergeben/genommen,
@@ -20,6 +20,18 @@ Wer Zugriff hat, wird bei jedem Aufruf live über den Bot geprüft (Rollen und R
 - **„Server verwalten“** → alles
 - **Staff-Rolle** (`roles.staff`) → Eingänge aller Bewerbungen
 - **Manager-Rolle** einer Bewerbung → Eingänge dieser Bewerbung
+
+## Bewerben im Browser
+
+Steht bei einer Bewerbung **Ausfüllen: Per Direktnachricht oder auf der Website**, gibt es dafür einen Link
+(`https://deine-adresse/bewerben/<Server-ID>/<Schlüssel>`), den der Editor zum Kopieren anzeigt. In Discord bekommen
+Bewerber zusätzlich den Button **Im Browser ausfüllen** – auch dann, wenn ihre DMs geschlossen sind.
+
+- Anmeldung mit Discord ist Pflicht, die Person muss auf dem Server sein.
+- Geprüft wird dasselbe wie per DM: Rollen, Sperren, offene Bewerbung, Wartezeit, Zeitlimit, Länge der Antworten,
+  Roblox-Konto (wird bei Roblox nachgeschlagen).
+- Alle Fragen stehen auf einer Seite. Danach läuft alles wie bei einer DM-Bewerbung: Team-Nachricht, Rollen,
+  Abschluss-DM mit Nummer.
 
 ## Einrichten
 

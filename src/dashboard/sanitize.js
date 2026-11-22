@@ -38,6 +38,9 @@ function sanitizeType(input, { guild, defaults, existingId, takenIds }) {
     panel: oneOf(input.panel, ['apply', 'quali'], 'apply'),
     workflow: oneOf(input.workflow, ['police', 'simple'], 'simple'),
     numberPrefix: text(input.numberPrefix, 8).toUpperCase() || 'Q',
+    mode: oneOf(input.mode, ['DM', 'DM_WEB'], 'DM'),
+    showStats: input.showStats !== false,
+    hideAnswers: bool(input.hideAnswers),
     channels: { open: channel(input.channels?.open), accepted: channel(input.channels?.accepted), rejected: channel(input.channels?.rejected) },
     messages: Object.fromEntries(MESSAGE_KEYS.map((key) => [key, text(input.messages?.[key], 2000) || defaults.messages[key]])),
     roles: {

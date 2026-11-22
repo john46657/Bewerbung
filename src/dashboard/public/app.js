@@ -19,11 +19,28 @@
     if (/^#[0-9a-f]{6}$/i.test(node.dataset.color)) node.style.background = node.dataset.color;
   }
 
+  // Zeichenzähler im Bewerbungsformular
+  for (const area of document.querySelectorAll('textarea[data-counter]')) {
+    const hint = area.nextElementSibling;
+    const base = hint?.textContent ?? '';
+    const update = () => {
+      const n = area.value.trim().length;
+      hint.textContent = `${n} Zeichen · ${base}`;
+      hint.classList.toggle('over', (area.minLength > 0 && n > 0 && n < area.minLength) || n > area.maxLength);
+    };
+    area.addEventListener('input', update);
+    if (area.value) update();
+  }
+  // Doppelklick auf „Absenden“ verhindern
+  for (const form of document.querySelectorAll('form[data-apply]')) {
+    form.addEventListener('submit', () => setTimeout(() => form.querySelector('button').setAttribute('disabled', ''), 0));
+  }
+
   const root = document.getElementById('editor');
   if (!root) return;
 
   // ---------- Editor ----------
-  const { type: initial, roles, channels, defaults } = JSON.parse(document.getElementById('editor-data').textContent);
+  const { type: initial, roles, channels, defaults, webBase } = JSON.parse(document.getElementById('editor-data').textContent);
   const state = structuredClone(initial);
   const isNew = Boolean(root.dataset.new);
   let dirty = false;
@@ -106,6 +123,28 @@
   function checkbox(label, checked, onChange) {
     return el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: Boolean(checked), onchange: (e) => (onChange(e.target.checked), changed()) }), el('span', { text: label }));
   }
+  // Minuten als Tage / Stunden / Minuten bearbeiten
+  function durationInput(minutes, onChange, { min = 0, max = 525600 } = {}) {
+    const parts = { d: Math.floor(minutes / 1440), h: Math.floor((minutes % 1440) / 60), m: minutes % 60 };
+    const box = (key, label, limit) =>
+      el(
+        'label',
+        { class: 'duration-part' },
+        el('input', {
+          type: 'number',
+          min: 0,
+          max: limit,
+          value: String(parts[key]),
+          oninput: (e) => {
+            parts[key] = Math.max(0, Number(e.target.value) || 0);
+            onChange(Math.min(max, Math.max(min, parts.d * 1440 + parts.h * 60 + parts.m)));
+            changed();
+          },
+        }),
+        el('span', { text: label }),
+      );
+    return el('div', { class: 'duration' }, box('d', 'Tage', 365), box('h', 'Std.', 23), box('m', 'Min.', 59));
+  }
   const section = (title, intro, ...content) => el('fieldset', { class: 'card' }, el('legend', { text: title }), intro ? el('p', { class: 'hint', text: intro }) : null, ...content);
 
   const channelOptions = [['', '— Standard —'], ...channels.map((c) => [c.id, `#${c.name}`])];
@@ -148,6 +187,13 @@
   // ---------- Fragen ----------
   const questionsWrap = el('div', { class: 'questions' });
 
+  function uniqueKey(base) {
+    const clean = base.replace(/[^a-z0-9_]/g, '_').slice(0, 28) || 'frage';
+    let key = clean;
+    for (let n = 2; state.questions.some((x) => x.key === key); n++) key = `${clean}_${n}`;
+    return key;
+  }
+
   function newQuestion() {
     return { key: '', type: 'TEXT', label: '', description: '', required: true, min: 10, max: 1000, _new: true };
   }
@@ -173,6 +219,7 @@
 
   function questionCard(q, index) {
     const details = el('div', { class: 'q-details' });
+    const lengthRow = el('div', { class: 'row' });
     const keyInput = textInput(q.key, (v) => {
       q.key = v;
       q._keyTouched = true;
@@ -180,16 +227,11 @@
 
     const drawDetails = () => {
       const parts = [];
-      if (q.type === 'TEXT') {
-        parts.push(
-          el(
-            'div',
-            { class: 'row' },
-            field('Mindestlänge', numberInput(q.min ?? 0, (v) => (q.min = v), { min: 0, max: 5000 })),
-            field('Höchstlänge', numberInput(q.max ?? 1000, (v) => (q.max = v), { min: 1, max: 5000 })),
-          ),
-        );
-      }
+      lengthRow.replaceChildren(
+        ...(q.type === 'TEXT'
+          ? [field('Mindestlänge (Zeichen)', numberInput(q.min ?? 0, (v) => (q.min = v), { min: 0, max: 5000 })), field('Höchstlänge (Zeichen)', numberInput(q.max ?? 1000, (v) => (q.max = v), { min: 1, max: 5000 }))]
+          : []),
+      );
       if (q.type === 'CHOICE' || q.type === 'ROLE') {
         q.options ??= [];
         const list = el('div', { class: 'options' });
@@ -243,6 +285,20 @@
           el('button', {
             type: 'button',
             class: 'btn btn-sm btn-ghost',
+            text: 'Duplizieren',
+            disabled: state.questions.length >= 50,
+            onclick: () => {
+              const copy = structuredClone(q);
+              copy.key = uniqueKey(`${q.key || 'frage'}_kopie`);
+              copy._new = false;
+              state.questions.splice(index + 1, 0, copy);
+              changed();
+              drawQuestions();
+            },
+          }),
+          el('button', {
+            type: 'button',
+            class: 'btn btn-sm btn-ghost',
             text: 'Löschen',
             onclick: () => {
               if (q.label && !window.confirm(`Frage „${q.label}“ löschen?`)) return;
@@ -264,8 +320,14 @@
         }, { maxlength: 250, placeholder: 'z. B. Warum möchtest du zu uns?' }),
       ),
       field('Zusatztext (optional)', textInput(q.description ?? '', (v) => (q.description = v), { maxlength: 500, placeholder: 'Erscheint klein unter der Frage' })),
-      el('div', { class: 'row' }, field('Schlüssel', keyInput, 'Intern, eindeutig je Bewerbung'), el('div', { class: 'field field-check' }, checkbox('Pflichtfrage', q.required !== false, (v) => (q.required = v)))),
       details,
+      el(
+        'details',
+        { class: 'q-more', open: Boolean(q._new) },
+        el('summary', { text: 'Prüfung & Feinheiten' }),
+        el('div', { class: 'row' }, field('Schlüssel', keyInput, 'Intern, eindeutig je Bewerbung'), el('div', { class: 'field field-check' }, checkbox('Pflichtfrage', q.required !== false, (v) => (q.required = v)))),
+        lengthRow,
+      ),
     );
   }
 
@@ -288,6 +350,27 @@
     idTouched = true;
   }, { maxlength: 24, pattern: '[a-z0-9_-]{2,24}', class: 'mono', placeholder: 'z. B. polizei', disabled: !isNew });
 
+  const linkBox = el('div', { class: 'link-box' });
+  function drawLink() {
+    if (state.mode !== 'DM_WEB') return linkBox.replaceChildren();
+    if (isNew || !state.id) return linkBox.replaceChildren(el('p', { class: 'hint', text: 'Den Link zum Formular siehst du hier nach dem ersten Speichern.' }));
+    const url = webBase + state.id;
+    const input = el('input', { type: 'text', value: url, readonly: true, class: 'mono', onfocus: (e) => e.target.select() });
+    const copy = el('button', {
+      type: 'button',
+      class: 'btn btn-sm',
+      text: 'Kopieren',
+      onclick: async () => {
+        try {
+          await navigator.clipboard.writeText(url);
+          copy.textContent = 'Kopiert ✓';
+        } catch {
+          input.select();
+        }
+      },
+    });
+    linkBox.replaceChildren(el('p', { class: 'hint', text: 'Ohne Panel teilen: Mit diesem Link kann man sich direkt im Browser bewerben (Anmeldung mit Discord).' }), el('div', { class: 'link-row' }, input, copy));
+  }
   const errorsBox = el('div', { class: 'notice notice-bad', hidden: true });
   const saveButton = el('button', { type: 'submit', class: 'btn btn-primary', text: isNew ? 'Bewerbungsart anlegen' : 'Speichern' });
 
@@ -324,10 +407,12 @@
           select([['simple', 'Einfach: offen → angenommen/abgelehnt'], ['police', 'Mit Prüfschritten: Prüfung → Gespräch → Entscheidung']], state.workflow, (v) => (state.workflow = v)),
         ),
       ),
+      field('Ausfüllen', select([['DM', 'Nur per Discord-Direktnachricht'], ['DM_WEB', 'Per Direktnachricht oder auf der Website']], state.mode ?? 'DM', (v) => ((state.mode = v), drawLink())), 'Bei „Website“ bekommen Bewerber in Discord zusätzlich einen Link zum Formular.'),
+      linkBox,
       el('p', { class: 'hint', text: 'In welchem Panel die Bewerbung erscheint, stellst du unter „Panels“ ein.' }),
       checkbox('Bewerbungen annehmen (sonst im Panel „geschlossen“)', state.enabled, (v) => (state.enabled = v)),
     ),
-    section('Fragen', 'Die Fragen kommen nacheinander per Direktnachricht. Reihenfolge mit ↑ ↓ ändern.', el('div', { class: 'card-head' }, questionCount), questionsWrap, addQuestionButton),
+    section('Fragen', 'Per DM kommen die Fragen nacheinander, auf der Website alle auf einer Seite. Reihenfolge mit ↑ ↓ ändern.', el('div', { class: 'card-head' }, questionCount), questionsWrap, addQuestionButton),
     section(
       'Texte',
       'Variablen: {applicant} Bewerber · {user} Entscheider · {applicationName} · {number} · {reason} · {questionCount} · {timeLimit}. Leer lassen = Standardtext.',
@@ -346,7 +431,7 @@
     ),
     section(
       'Kanäle',
-      '„Standard“ nimmt den Kanal aus „Panels & Kanäle“.',
+      '„Standard“ nimmt den Standard-Kanal von der Seite „Bewerbungen“.',
       el(
         'div',
         { class: 'row' },
@@ -361,14 +446,16 @@
       el(
         'div',
         { class: 'row' },
-        field('Wartezeit zwischen zwei Bewerbungen (Minuten)', numberInput(state.cooldownMinutes, (v) => (state.cooldownMinutes = v), { min: 0, max: 525600 }), '1440 = 1 Tag, 10080 = 1 Woche'),
-        field('Zeit zum Ausfüllen (Minuten)', numberInput(state.timeLimitMinutes, (v) => (state.timeLimitMinutes = v), { min: 5, max: 10080 }), '5 bis 10080'),
+        field('Wartezeit bis zur nächsten Bewerbung', durationInput(state.cooldownMinutes ?? 0, (v) => (state.cooldownMinutes = v)), '0 = keine Wartezeit'),
+        field('Zeit zum Ausfüllen', durationInput(state.timeLimitMinutes ?? 180, (v) => (state.timeLimitMinutes = v), { min: 5, max: 10080 }), 'Mindestens 5 Minuten, höchstens 7 Tage'),
       ),
       field(
         'Wenn die Person den Server verlässt',
         select([['WITHDRAW', 'Bewerbung zurückziehen'], ['DENY', 'Bewerbung ablehnen'], ['NONE', 'Nichts tun']], state.onLeave, (v) => (state.onLeave = v)),
       ),
       checkbox('Zu jeder Bewerbung einen Thread fürs Team öffnen', state.teamThreads, (v) => (state.teamThreads = v)),
+      checkbox('Statistik in der Team-Nachricht zeigen (Dauer, Konto- und Server-Alter)', state.showStats !== false, (v) => (state.showStats = v)),
+      checkbox('Antworten in der Team-Nachricht verstecken (nur im Dashboard sichtbar)', state.hideAnswers, (v) => (state.hideAnswers = v)),
     ),
     errorsBox,
     el('div', { class: 'form-actions sticky' }, el('a', { class: 'btn btn-ghost', href: root.dataset.back, text: 'Abbrechen' }), saveButton),
@@ -377,6 +464,7 @@
   state.channels ??= { open: '', accepted: '', rejected: '' };
   root.replaceChildren(form);
   drawQuestions();
+  drawLink();
 
   async function save(event) {
     event.preventDefault();

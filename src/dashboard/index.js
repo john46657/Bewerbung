@@ -81,6 +81,7 @@ function start(client) {
 
   auth.routes(app, config);
   app.get('/', (req, res) => send(res, pages.home({ session: req.session, query: req.query })));
+  require('./apply').routes(app, client);
 
   app.get('/server', auth.requireLogin, async (req, res) => {
     const list = [];
@@ -230,7 +231,7 @@ function start(client) {
   function editorPage(req, res, type, isNew) {
     const { guild, config: guildConfig } = req.ctx;
     const defaults = guildConfig.applications.defaults;
-    send(res, pages.typeEditor({ ctx: req.ctx, type, isNew, roles: roleList(guild), channels: textChannels(guild), defaults: { messages: defaults.messages, emoji: defaults.emoji } }));
+    send(res, pages.typeEditor({ ctx: req.ctx, type, isNew, roles: roleList(guild), channels: textChannels(guild), defaults: { messages: defaults.messages, emoji: defaults.emoji }, webBase: `${config.url}/bewerben/${guild.id}/` }));
   }
 
   guildRouter.get('/formulare/neu', requireManage, (req, res) => {
@@ -324,6 +325,10 @@ function start(client) {
         channel: p.channel ?? '',
         buttonLabel: p.buttonLabel ?? '',
         placeholder: p.placeholder ?? '',
+        style: p.style ?? 'auto',
+        author: p.author ?? '',
+        thumbnail: p.thumbnail ?? '',
+        footer: p.footer ?? '',
         types: linked.map((t) => t.id),
         typeNames: linked.map((t) => t.name),
         posted: posted.filter((x) => x.kind === id).length,
@@ -344,7 +349,7 @@ function start(client) {
   }
 
   guildRouter.get('/panels/neu', requireManage, (req, res) => {
-    panelEditorPage(req, res, { id: '', name: '', title: 'Bewerbungen', description: 'Wähle unten aus, wofür du dich bewerben möchtest. Die Fragen kommen per Direktnachricht – lass deine DMs offen!', image: '', color: '', channel: '', buttonLabel: '', placeholder: '', types: [] }, true);
+    panelEditorPage(req, res, { style: 'auto', author: '', thumbnail: '', footer: '', id: '', name: '', title: 'Bewerbungen', description: 'Wähle unten aus, wofür du dich bewerben möchtest. Die Fragen kommen per Direktnachricht – lass deine DMs offen!', image: '', color: '', channel: '', buttonLabel: '', placeholder: '', types: [] }, true);
   });
 
   guildRouter.get('/panels/:panelId', requireManage, (req, res) => {
@@ -367,6 +372,7 @@ function start(client) {
     const channels = new Set(textChannels(guild).map((c) => c.id));
     const typeIds = new Set(store.types(guild.id).map((t) => t.id));
     const image = textValue(body.image, 500);
+    const thumbnail = textValue(body.thumbnail, 500);
     const color = textValue(body.color, 7);
     const panel = {
       name: textValue(body.name, 80),
@@ -377,10 +383,15 @@ function start(client) {
       channel: typeof body.channel === 'string' && channels.has(body.channel) ? body.channel : '',
       buttonLabel: textValue(body.buttonLabel, 80),
       placeholder: textValue(body.placeholder, 150),
+      style: ['auto', 'menu', 'buttons'].includes(body.style) ? body.style : 'auto',
+      author: textValue(body.author, 100),
+      thumbnail: /^https:\/\/\S+$/.test(thumbnail) ? thumbnail : '',
+      footer: textValue(body.footer, 200),
       types: [...new Set(Array.isArray(body.types) ? body.types.filter((id) => typeIds.has(id)) : [])].slice(0, 25),
     };
     if (!panel.title) errors.push('Das Panel braucht einen Titel.');
     if (image && !panel.image) errors.push('Die Bild-URL muss mit https:// beginnen.');
+    if (thumbnail && !panel.thumbnail) errors.push('Die Vorschaubild-URL muss mit https:// beginnen.');
     if (body.send && !panel.channel) errors.push('Wähle einen Kanal, in den das Panel gesendet wird.');
     if (errors.length) return res.status(400).json({ errors });
 

@@ -6,6 +6,9 @@ const { data, save } = require('../lib/db');
 const API = 'https://discord.com/api/v10';
 const COOKIE = 'enrp_session';
 const STATE_COOKIE = 'enrp_oauth';
+const NEXT_COOKIE = 'enrp_next';
+// Nur eigene Pfade als Rücksprungziel (kein //fremde-seite.de)
+const safeNext = (value) => (typeof value === 'string' && /^\/(?![/\\])[\w\-./?=&%]*$/.test(value) ? value : null);
 const SESSION_DAYS = 7;
 const MANAGE_GUILD = 1n << 5n;
 const ADMINISTRATOR = 1n << 3n;
@@ -71,6 +74,7 @@ function routes(app, config) {
   app.get('/auth/login', (req, res) => {
     const state = random();
     setCookie(res, config, STATE_COOKIE, state, 600);
+    setCookie(res, config, NEXT_COOKIE, safeNext(req.query.next) ?? '', 600);
     const params = new URLSearchParams({
       client_id: config.clientId(),
       redirect_uri: redirectUri,
@@ -83,8 +87,11 @@ function routes(app, config) {
   });
 
   app.get('/auth/callback', async (req, res) => {
-    const expected = parseCookies(req.headers.cookie)[STATE_COOKIE];
+    const cookies = parseCookies(req.headers.cookie);
+    const expected = cookies[STATE_COOKIE];
+    const next = safeNext(cookies[NEXT_COOKIE]);
     setCookie(res, config, STATE_COOKIE, '', 0);
+    setCookie(res, config, NEXT_COOKIE, '', 0);
     const { code, state, error } = req.query;
     if (error) return res.redirect('/?fehler=abgebrochen');
     if (!code || typeof code !== 'string' || !expected || state !== expected) return res.redirect('/?fehler=sitzung');
@@ -127,7 +134,7 @@ function routes(app, config) {
       }).catch(() => {});
 
       setCookie(res, config, COOKIE, sessionToken, SESSION_DAYS * 86_400);
-      res.redirect('/server');
+      res.redirect(next ?? '/server');
     } catch (err) {
       console.error('[dashboard] Anmeldung fehlgeschlagen:', err.message);
       res.redirect('/?fehler=discord');
@@ -148,7 +155,7 @@ function routes(app, config) {
 // Middleware: nur angemeldet weiter.
 function requireLogin(req, res, next) {
   if (req.session) return next();
-  if (req.method === 'GET') return res.redirect('/auth/login');
+  if (req.method === 'GET') return res.redirect(`/auth/login?next=${encodeURIComponent(req.originalUrl)}`);
   return res.status(401).json({ error: 'Bitte melde dich erneut an.' });
 }
 

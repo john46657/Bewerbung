@@ -7,9 +7,11 @@ const {
   ContainerBuilder,
   MediaGalleryBuilder,
   MessageFlags,
+  SectionBuilder,
   SeparatorBuilder,
   StringSelectMenuBuilder,
   TextDisplayBuilder,
+  ThumbnailBuilder,
 } = require('discord.js');
 const { base, forGuild } = require('../settings');
 const { embed, truncate } = require('../util');
@@ -17,6 +19,7 @@ const { bucket, save } = require('../db');
 const store = require('./store');
 const { AI_ICONS } = require('./aiCheck');
 const { profileUrl } = require('./roblox');
+const { dashboardUrl } = require('../dashboardUrl');
 
 const STATUS_COLORS = { ACCEPTED: 'success', REJECTED: 'danger', WITHDRAWN: '#99AAB5', SCREENING: 'warning', INTERVIEW: 'warning', PENDING_DECISION: 'warning' };
 const unix = (ms) => Math.floor(ms / 1000);
@@ -42,11 +45,20 @@ function buildPanel(guildId, kind) {
   const panel = forGuild(guildId).applications.panels[kind];
   if (!panel) return null;
   const list = panelTypes(guildId, kind);
-  const container = new ContainerBuilder()
-    .setAccentColor(accent(panel))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${panel.title}${panel.description ? `\n${panel.description}` : ''}`));
+  // style: "auto" (1 Bewerbung = Button, mehrere = Auswahlmenü), "menu" oder "buttons"
+  const style = panel.style === 'buttons' || panel.style === 'menu' ? panel.style : 'auto';
+  const asButtons = list.length > 0 && (style === 'buttons' || (style === 'auto' && list.length === 1));
+  const head = `${panel.author ? `-# **${panel.author}**\n` : ''}## ${panel.title}${panel.description ? `\n${panel.description}` : ''}`;
+  const container = new ContainerBuilder().setAccentColor(accent(panel));
+  if (panel.thumbnail) {
+    container.addSectionComponents(
+      new SectionBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(head)).setThumbnailAccessory(new ThumbnailBuilder().setURL(panel.thumbnail)),
+    );
+  } else {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(head));
+  }
 
-  if (list.length > 1 || kind === 'quali' || !list.length) {
+  if ((list.length > 1 && panel.showList !== false) || kind === 'quali' || !list.length) {
     container.addSeparatorComponents(new SeparatorBuilder()).addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         list.length
@@ -58,9 +70,25 @@ function buildPanel(guildId, kind) {
   if (panel.image) {
     container.addSeparatorComponents(new SeparatorBuilder()).addMediaGalleryComponents(new MediaGalleryBuilder().addItems((item) => item.setURL(panel.image)));
   }
+  if (panel.footer) container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${panel.footer}`));
 
   const components = [container];
-  if (list.length === 1) {
+  if (asButtons && list.length > 1) {
+    // Ein Button je Bewerbung, 5 pro Reihe
+    for (let i = 0; i < Math.min(list.length, 25); i += 5) {
+      components.push(
+        new ActionRowBuilder().addComponents(
+          list.slice(i, i + 5).map((t) =>
+            new ButtonBuilder()
+              .setCustomId(`quali:apply:${t.id}`)
+              .setLabel(truncate(t.name, 80))
+              .setStyle(t.enabled ? ButtonStyle.Primary : ButtonStyle.Secondary)
+              .setEmoji(t.emoji),
+          ),
+        ),
+      );
+    }
+  } else if (asButtons) {
     components.push(
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -70,7 +98,7 @@ function buildPanel(guildId, kind) {
           .setEmoji(list[0].emoji),
       ),
     );
-  } else if (list.length > 1) {
+  } else if (list.length) {
     components.push(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
@@ -130,9 +158,11 @@ function infoEmbed(record, type) {
 
   const applicant = [`<@${record.userId}> · \`${record.userId}\``];
   if (record.roblox) applicant.push(`Roblox: [${record.roblox.name}](${profileUrl(record.roblox.id)}) (ID ${record.roblox.id})`);
-  if (record.joinedAt) applicant.push(`Auf dem Server seit <t:${unix(record.joinedAt)}:R>`);
-  if (record.accountCreatedAt) applicant.push(`Discord-Konto seit <t:${unix(record.accountCreatedAt)}:R>`);
-  applicant.push(`Dauer: ${formatDuration(record.durationMs ?? 0)}`);
+  if (type.showStats !== false) {
+    if (record.joinedAt) applicant.push(`Auf dem Server seit <t:${unix(record.joinedAt)}:R>`);
+    if (record.accountCreatedAt) applicant.push(`Discord-Konto seit <t:${unix(record.accountCreatedAt)}:R>`);
+    applicant.push(`Dauer: ${formatDuration(record.durationMs ?? 0)}${record.source === 'WEB' ? ' · über die Website' : ''}`);
+  }
   info.addFields({ name: 'Bewerber', value: applicant.join('\n') });
 
   if (record.ai) {
@@ -197,6 +227,8 @@ function answersFile(record, type) {
   return new AttachmentBuilder(Buffer.from(lines.join('\n'), 'utf8'), { name: `bewerbung-${record.number}.txt` });
 }
 
+const recordUrl = (record) => `${dashboardUrl()}/g/${record.guildId}/eingaenge/${record.number}`;
+
 function teamComponents(record, type) {
   const open = store.isOpenStatus(record.status);
   const rows = [];
@@ -214,6 +246,7 @@ function teamComponents(record, type) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`quali:history:${record.userId}`).setLabel('Verlauf').setStyle(ButtonStyle.Secondary).setEmoji('📜'),
       new ButtonBuilder().setCustomId(`quali:ticket:${record.number}`).setLabel('Ticket mit Bewerber öffnen').setStyle(ButtonStyle.Secondary).setEmoji('🎫'),
+      ...(dashboardUrl() ? [new ButtonBuilder().setURL(recordUrl(record)).setLabel('Im Dashboard').setStyle(ButtonStyle.Link)] : []),
     ),
   );
   const next = (store.POLICE_TRANSITIONS[record.status] ?? []).filter((s) => !['ACCEPTED', 'REJECTED'].includes(s));
@@ -233,6 +266,11 @@ function teamComponents(record, type) {
 // withFile: beim ersten Senden die vollständigen Antworten anhängen, falls etwas gekürzt wurde.
 function buildTeamMessage(record, type, { withFile = false, components = true } = {}) {
   const info = infoEmbed(record, type);
+  // „Antworten verstecken“: Antworten nur im Dashboard (bzw. /bewerbungen anzeigen), nicht im Kanal.
+  if (type.hideAnswers) {
+    info.addFields({ name: 'Antworten', value: dashboardUrl() ? `Nur im [Dashboard](${recordUrl(record)}) sichtbar.` : 'Ausgeblendet – ansehen mit `/bewerbungen anzeigen`.' });
+    return { embeds: [info], components: components ? teamComponents(record, type) : [], allowedMentions: { parse: [] } };
+  }
   const { embeds, truncated } = answerEmbeds(record, 5900 - embedChars(info));
   const message = { embeds: [info, ...embeds], components: components ? teamComponents(record, type) : [], allowedMentions: { parse: [] } };
   if (withFile && truncated) message.files = [answersFile(record, type)];

@@ -40,6 +40,7 @@
       "panel": "quali",
       "workflow": "simple",
       "numberPrefix": "Q",
+      "mode": "DM",
       "emoji": "📝",
       "description": "",
       "channels": {
@@ -71,7 +72,9 @@
       "cooldownMinutes": 1440,
       "timeLimitMinutes": 180,
       "onLeave": "WITHDRAW",
-      "questions": []
+      "questions": [],
+      "showStats": true,
+      "hideAnswers": false
     },
     "types": []
   },

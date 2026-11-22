@@ -9,6 +9,7 @@ const { findRobloxUser, profileUrl } = require('./roblox');
 const { aiCheck } = require('./aiCheck');
 const { buildTeamMessage } = require('./messages');
 const { applyRoles } = require('./roles');
+const { webApplyUrl } = require('../dashboardUrl');
 
 const sessions = new Map(); // userId → Sitzung
 
@@ -33,6 +34,7 @@ async function offer(interaction, typeId) {
   const error = store.eligibility(interaction.member, type);
   if (error) return replyPrivate(interaction, error);
 
+  const webUrl = webApplyUrl(interaction.guildId, type);
   let dm;
   try {
     dm = await interaction.user.createDM();
@@ -47,16 +49,28 @@ async function offer(interaction, typeId) {
         new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`quali:start:${interaction.guildId}:${type.id}`).setLabel('Bewerbung starten').setStyle(ButtonStyle.Success).setEmoji('▶️'),
           new ButtonBuilder().setCustomId('quali:cancel').setLabel('Abbrechen').setStyle(ButtonStyle.Secondary),
+          ...(webUrl ? [new ButtonBuilder().setLabel('Im Browser ausfüllen').setStyle(ButtonStyle.Link).setURL(webUrl)] : []),
         ),
       ],
     });
   } catch {
+    if (webUrl) {
+      return replyPrivate(interaction, {
+        content: 'Ich kann dir keine Direktnachricht schicken – du kannst die Bewerbung aber im Browser ausfüllen.',
+        components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Im Browser ausfüllen').setStyle(ButtonStyle.Link).setURL(webUrl))],
+      });
+    }
     return replyPrivate(interaction, '❌ Ich kann dir keine Direktnachricht schicken. Erlaube DMs von Servermitgliedern (Servereinstellungen → Privatsphäre) und versuche es erneut.');
   }
 
   return replyPrivate(interaction, {
-    content: '📬 Ich habe dir eine Direktnachricht geschickt.',
-    components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Zur Bewerbung').setStyle(ButtonStyle.Link).setURL(dmLink(dm.id)))],
+    content: webUrl ? '📬 Ich habe dir eine Direktnachricht geschickt – oder fülle die Bewerbung im Browser aus.' : '📬 Ich habe dir eine Direktnachricht geschickt.',
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel('Zur Bewerbung').setStyle(ButtonStyle.Link).setURL(dmLink(dm.id)),
+        ...(webUrl ? [new ButtonBuilder().setLabel('Im Browser ausfüllen').setStyle(ButtonStyle.Link).setURL(webUrl)] : []),
+      ),
+    ],
   });
 }
 
@@ -316,18 +330,25 @@ async function submit(client, session) {
   const error = store.eligibility(member, type, { robloxId: session.roblox?.id }) ?? answerError;
   if (error) return fail(error);
 
-  const answers = session.answers.map(({ raw, ...rest }) => rest);
+  await finalize({ guild, member, user, type, answers: session.answers, roblox: session.roblox, roleSelections: session.roleSelections, startedAt: session.startedAt });
+}
+
+// Bewerbung anlegen, Team-Nachricht, Rollen, Abschluss-DM. Gemeinsam für DM und Website.
+// answers: [{ key, question, type, answer, raw?, ms?, cpm? }] – alle Prüfungen sind vorher gelaufen.
+async function finalize({ guild, member, user, type, answers: given, roblox, roleSelections, startedAt, source = 'DM' }) {
+  const answers = given.map(({ raw, ...rest }) => rest);
   const record = store.createRecord(guild.id, type, {
     userId: member.id,
     userTag: member.user.tag,
     avatarUrl: member.displayAvatarURL(),
-    roblox: session.roblox,
+    roblox,
     answers,
-    roleSelections: session.roleSelections,
-    durationMs: Date.now() - session.startedAt,
+    roleSelections,
+    durationMs: Date.now() - startedAt,
     joinedAt: member.joinedTimestamp,
     accountCreatedAt: member.user.createdTimestamp,
-    ai: aiCheck(session.answers),
+    ai: aiCheck(given),
+    source,
   });
 
   const channel = await guild.channels.fetch(teamChannelId(guild.id, type)).catch(() => null);
@@ -363,6 +384,7 @@ async function submit(client, session) {
       ],
     })
     .catch(() => {});
+  return record;
 }
 
 // Läuft jede Minute: abgelaufene Sitzungen beenden.
@@ -377,4 +399,4 @@ function cancelForMember(guildId, userId) {
   if (session?.guildId === guildId) end(session);
 }
 
-module.exports = { offer, start, cancelFromButton, handleDirectMessage, handleSelect, handleSkip, handleRoblox, sweep, cancelForMember, sessions };
+module.exports = { finalize, teamChannelId, offer, start, cancelFromButton, handleDirectMessage, handleSelect, handleSkip, handleRoblox, sweep, cancelForMember, sessions };
