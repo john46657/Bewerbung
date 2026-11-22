@@ -25,7 +25,19 @@ function sanitizeType(input, { guild, defaults, existingId, takenIds }) {
   const roles = (list) => [...new Set((Array.isArray(list) ? list : []).filter((id) => roleIds.has(id)))];
   const channel = (id) => (typeof id === 'string' && channelIds.has(id) ? id : '');
 
-  const id = existingId ?? text(input.id, 24).toLowerCase();
+  // Schlüssel und Nummern-Präfix werden bei neuen Bewerbungen automatisch aus dem Namen gebildet.
+  const slug = text(input.name, 80)
+    .toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  let id = existingId;
+  if (!id) {
+    const base = slug.slice(0, 20).replace(/-+$/, '') || 'bewerbung';
+    id = base.length >= 2 && !['neu', 'kanal'].includes(base) ? base : `bewerbung-${base}`.slice(0, 24);
+    for (let n = 2; takenIds.includes(id); n++) id = `${base.slice(0, 20)}-${n}`;
+  }
+  const autoPrefix = (slug.replace(/[^a-z0-9]/g, '').slice(0, 4) || 'Q').toUpperCase();
   if (!existingId && ['neu', 'kanal'].includes(id)) errors.push(`Der Schlüssel „${id}“ ist reserviert.`);
   if (!existingId && takenIds.includes(id)) errors.push(`Der Schlüssel „${id}“ ist schon vergeben.`);
 
@@ -37,7 +49,7 @@ function sanitizeType(input, { guild, defaults, existingId, takenIds }) {
     enabled: bool(input.enabled),
     panel: oneOf(input.panel, ['apply', 'quali'], 'apply'),
     workflow: oneOf(input.workflow, ['police', 'simple'], 'simple'),
-    numberPrefix: text(input.numberPrefix, 8).toUpperCase() || 'Q',
+    numberPrefix: existingId ? text(input.numberPrefix, 8).toUpperCase() || 'Q' : autoPrefix,
     mode: oneOf(input.mode, ['DM', 'DM_WEB'], 'DM'),
     showStats: input.showStats !== false,
     hideAnswers: bool(input.hideAnswers),
@@ -60,10 +72,25 @@ function sanitizeType(input, { guild, defaults, existingId, takenIds }) {
   if (!/^[A-Z0-9]{1,8}$/.test(type.numberPrefix)) errors.push('Das Nummern-Präfix darf nur A–Z und 0–9 enthalten (1–8 Zeichen).');
 
   const questions = Array.isArray(input.questions) ? input.questions.slice(0, 50) : [];
+  const usedKeys = new Set();
   questions.forEach((q, index) => {
     const n = index + 1;
+    // Schlüssel automatisch: gültiger vorhandener bleibt, sonst aus dem Fragetext, immer eindeutig
+    let key = text(q.key, 32).toLowerCase();
+    if (!/^[a-z0-9_]{1,32}$/.test(key) || usedKeys.has(key)) {
+      const base =
+        text(q.label, 250)
+          .toLowerCase()
+          .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 28) || 'frage';
+      key = base;
+      for (let n = 2; usedKeys.has(key); n++) key = `${base}_${n}`;
+    }
+    usedKeys.add(key);
     const question = {
-      key: text(q.key, 32).toLowerCase(),
+      key,
       type: oneOf(q.type, QUESTION_TYPES, 'TEXT'),
       label: text(q.label, 250),
       required: q.required !== false,

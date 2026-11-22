@@ -23,8 +23,7 @@ aus `applications.defaults`.
 
 Das Präfix der Nummer legt `numberPrefix` fest. Gezählt wird je Präfix und Server.
 
-Mit `panel` bestimmst du, wo eine Art erscheint: im **Bewerbungs-Panel** (`apply`, z. B. Polizei) oder im
-**Qualifikations-Panel** (`quali`, Standard).
+In welchem Panel eine Art erscheint, legst du im Panel selbst fest (Dashboard → Panels → verknüpfte Bewerbungen).
 
 Erlaubte Statuswechsel der Polizei-Bewerbung (`POLICE_TRANSITIONS` in `src/lib/applications/store.js`):
 
@@ -150,11 +149,10 @@ Einstellen kannst du per `config.json` (alles, Vorlage für alle Server) oder pe
 `/einstellungen bewerbungs-kanaele` (die wichtigsten Werte, ohne Neustart, nur für den jeweiligen Server).
 
 ### 6.1 Panels
-- **Bewerbungs-Panel** (`applications.panels.apply`: Titel, Beschreibung, Bild): Bei einer Art erscheint der Button
-  *Jetzt bewerben*, bei mehreren ein Auswahlmenü. Posten mit `/bewerbungspanel`.
-- **Qualifikations-Panel** (`applications.panels.quali`): Beschreibung jeder Einheit plus Auswahlmenü. Posten mit
-  `/qualipanel`.
-- Gepostete Panels aktualisieren sich beim Bot-Start und nach `/einstellungen bewerbung` automatisch.
+- Es gibt keine vorgefertigten Panels. Panels legst du im [Dashboard](dashboard.md) unter **Panels** an: verknüpfte
+  Bewerbungen, Titel, Text, Bilder, Darstellung (Button oder Auswahlmenü).
+- Senden direkt aus dem Dashboard oder in Discord mit `/bewerbungspanel panel:<Name>`.
+- Gepostete Panels aktualisieren sich beim Bot-Start und beim Speichern im Dashboard automatisch.
 
 ### 6.2 Bewerbungsarten
 `id` (Schlüssel, `a-z0-9_-`, 2–24 Zeichen), `name`, `emoji`, `description`, `panel`, `workflow`, `numberPrefix`,
@@ -279,7 +277,7 @@ hohem Verdacht. **Nur ein Hinweis, kein Beweis.** Frag im Zweifel im Gespräch n
 | alle | sich bewerben (`/bewerbung`, Panels), eigene Bewerbung zurückziehen |
 | **Manager-Rollen** einer Art | diese Art entscheiden, Statusschritte, Verlauf, Ticket öffnen; `/bewerbungen` (außer löschen), `/bewerbungssperre` |
 | **Staff** (`roles.staff` oder „Server verwalten“) | alles oben für alle Arten, dazu `/bewerbungen loeschen` |
-| „Server verwalten“ | `/bewerbungspanel`, `/qualipanel`, `/einstellungen` |
+| „Server verwalten“ | `/bewerbungspanel`, `/einstellungen` |
 
 ---
 
@@ -289,7 +287,6 @@ hohem Verdacht. **Nur ein Hinweis, kein Beweis.** Frag im Zweifel im Gespräch n
 |---|---|---|
 | `/bewerbung [art]` | alle | Bewerbung starten (ohne Angabe: erste Art im Bewerbungs-Panel) |
 | `/bewerbungspanel` | „Server verwalten“ | Bewerbungs-Panel in den Kanal posten |
-| `/qualipanel` | „Server verwalten“ | Qualifikations-Panel in den Kanal posten |
 | `/bewerbungen offen [art]` | Team | offene Bewerbungen mit Links |
 | `/bewerbungen in-bearbeitung` | Team | gerade laufende DM-Bewerbungen |
 | `/bewerbungen anzeigen <nummer>` | Team | Bewerbung mit allen Antworten (auch als `.txt`) |
@@ -328,7 +325,7 @@ Gespeichert wird in `data/db.json` (keine externe Datenbank):
 | `src/lib/applications/roblox.js` | Roblox-Suche |
 | `src/lib/applications/roles.js` | Rollen geben/nehmen |
 | `src/lib/applications/normalize.js` | Standardwerte (`defaults`) auf alle Arten anwenden |
-| `src/commands/applications/` | `/bewerbung`, `/bewerbungspanel`, `/qualipanel`, `/bewerbungen`, `/bewerbungssperre` |
+| `src/commands/applications/` | `/bewerbung`, `/bewerbungspanel`, `/bewerbungen`, `/bewerbungssperre` |
 
 ---
 
@@ -358,7 +355,7 @@ oder sind durch Discord-Funktionen ersetzt:
 2. Je Bewerbungsart mindestens die **Manager-Rolle** und die **Annahme-Rolle** setzen:
    `/einstellungen bewerbung art:Polizei-Bewerbung manager_rolle:@Ausbilder annahme_rolle:@Polizeianwärter`.
    Fragen und Texte passt du in der `config.json` an.
-3. Im Panel-Kanal `/bewerbungspanel` bzw. `/qualipanel` ausführen.
+3. Im Dashboard unter **Panels** ein Panel anlegen und in den Kanal senden (oder `/bewerbungspanel panel:<Name>`).
 4. Eine Testbewerbung mit einem zweiten Konto durchspielen:
    - DM-Fragen beantworten
    - Bewerbung erscheint im Team-Kanal

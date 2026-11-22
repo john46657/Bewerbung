@@ -14,7 +14,6 @@ const { memberOf, canManage, canReview, reviewableTypes, hasAccess } = require('
 const { sanitizeType } = require('./sanitize');
 
 const PAGE_SIZE = 25;
-const BUILT_IN = { apply: 'Bewerbungs-Panel (/bewerbungspanel)', quali: 'Qualifikations-Panel (/qualipanel)' };
 
 function readConfig(client) {
   const url = (process.env.DASHBOARD_URL ?? '').trim().replace(/\/+$/, '');
@@ -266,16 +265,6 @@ function start(client) {
     });
     if (errors.length) return res.status(400).json({ errors });
 
-    // Die beiden alten Panels zeigen ohne eigene Liste alle Arten mit passendem `panel`. Damit eine neue Bewerbung
-    // nicht ungefragt dort auftaucht, wird ihre aktuelle Auswahl einmalig festgeschrieben.
-    if (isNew) {
-      const panels = structuredClone(settings.forGuild(guild.id).applications.panels);
-      const open = Object.keys(BUILT_IN).filter((id) => panels[id] && !Array.isArray(panels[id].types));
-      if (open.length) {
-        for (const id of open) panels[id].types = appMessages.panelTypes(guild.id, id).map((t) => t.id);
-        settings.setApplicationPanels(guild.id, panels);
-      }
-    }
     const next = isNew ? [...current, type] : current.map((t) => (t.id === type.id ? type : t));
     await saveTypes(guild, structuredClone(next));
     res.json({ ok: true, redirect: `/g/${guild.id}/formulare/${type.id}?ok=gespeichert` });
@@ -316,8 +305,7 @@ function start(client) {
       const linked = appMessages.panelTypes(guild.id, id);
       return {
         id,
-        name: p.name || BUILT_IN[id] || id,
-        builtIn: Boolean(BUILT_IN[id]),
+        name: p.name || '',
         title: p.title,
         description: p.description ?? '',
         image: p.image ?? '',
@@ -404,7 +392,7 @@ function start(client) {
         .replace(/^-+|-+$/g, '')
         .slice(0, 20) || 'panel';
       id = slug;
-      for (let n = 2; panels[id] || BUILT_IN[id]; n++) id = `${slug}-${n}`;
+      for (let n = 2; panels[id]; n++) id = `${slug}-${n}`;
     }
     panels[id] = { ...panels[id], ...panel };
     settings.setApplicationPanels(guild.id, panels);
@@ -430,7 +418,7 @@ function start(client) {
     const { guild } = req.ctx;
     const panels = structuredClone(settings.forGuild(guild.id).applications.panels);
     const id = req.params.panelId;
-    if (panels[id] && !BUILT_IN[id]) {
+    if (panels[id]) {
       delete panels[id];
       settings.setApplicationPanels(guild.id, panels);
       await appMessages.refreshPanels(guild).catch(() => {});

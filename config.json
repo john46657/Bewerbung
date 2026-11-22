@@ -23,18 +23,7 @@
   "applications": {
     "channel": "",
     "qualiChannel": "",
-    "panels": {
-      "apply": {
-        "title": "📋 Bewerbung",
-        "description": "Du möchtest Teil unseres Teams werden? Klicke unten und der Bot stellt dir die Fragen per **Direktnachricht** – lass deine DMs offen!",
-        "image": ""
-      },
-      "quali": {
-        "title": "🎖️ Einheiten & Qualifikationen",
-        "description": "Bewirb dich für eine Einheit oder Qualifikation. Wähle unten aus, wofür du dich bewerben möchtest.",
-        "image": ""
-      }
-    },
+    "panels": {},
     "defaults": {
       "enabled": true,
       "panel": "quali",

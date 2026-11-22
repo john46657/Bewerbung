@@ -44,7 +44,6 @@
   const state = structuredClone(initial);
   const isNew = Boolean(root.dataset.new);
   let dirty = false;
-  let idTouched = !isNew;
 
   const QUESTION_TYPES = [
     ['TEXT', 'Freitext'],
@@ -220,10 +219,6 @@
   function questionCard(q, index) {
     const details = el('div', { class: 'q-details' });
     const lengthRow = el('div', { class: 'row' });
-    const keyInput = textInput(q.key, (v) => {
-      q.key = v;
-      q._keyTouched = true;
-    }, { maxlength: 32, pattern: '[a-z0-9_]+', class: 'mono' });
 
     const drawDetails = () => {
       const parts = [];
@@ -313,10 +308,6 @@
         'Frage',
         textInput(q.label, (v) => {
           q.label = v;
-          if (q._new && !q._keyTouched) {
-            q.key = slug(v, 32);
-            keyInput.value = q.key;
-          }
         }, { maxlength: 250, placeholder: 'z. B. Warum möchtest du zu uns?' }),
       ),
       field('Zusatztext (optional)', textInput(q.description ?? '', (v) => (q.description = v), { maxlength: 500, placeholder: 'Erscheint klein unter der Frage' })),
@@ -325,7 +316,7 @@
         'details',
         { class: 'q-more', open: Boolean(q._new) },
         el('summary', { text: 'Prüfung & Feinheiten' }),
-        el('div', { class: 'row' }, field('Schlüssel', keyInput, 'Intern, eindeutig je Bewerbung'), el('div', { class: 'field field-check' }, checkbox('Pflichtfrage', q.required !== false, (v) => (q.required = v)))),
+        checkbox('Pflichtfrage', q.required !== false, (v) => (q.required = v)),
         lengthRow,
       ),
     );
@@ -345,10 +336,6 @@
   });
 
   // ---------- Formular aufbauen ----------
-  const idInput = textInput(state.id, (v) => {
-    state.id = v;
-    idTouched = true;
-  }, { maxlength: 24, pattern: '[a-z0-9_-]{2,24}', class: 'mono', placeholder: 'z. B. polizei', disabled: !isNew });
 
   const linkBox = el('div', { class: 'link-box' });
   function drawLink() {
@@ -385,20 +372,10 @@
         { class: 'row' },
         field('Name', textInput(state.name, (v) => {
           state.name = v;
-          if (isNew && !idTouched) {
-            state.id = slug(v, 24).replace(/_/g, '-');
-            idInput.value = state.id;
-          }
         }, { maxlength: 80, required: true, placeholder: 'z. B. Polizei-Bewerbung' })),
         field('Emoji', textInput(state.emoji, (v) => (state.emoji = v), { maxlength: 32, class: 'short' })),
       ),
       field('Beschreibung', textArea(state.description, (v) => (state.description = v), { maxlength: 300, rows: 2, placeholder: 'Erscheint im Panel und im Auswahlmenü' })),
-      el(
-        'div',
-        { class: 'row' },
-        field('Schlüssel', idInput, isNew ? 'Kann später nicht mehr geändert werden' : 'Kann nicht geändert werden'),
-        field('Nummern-Präfix', textInput(state.numberPrefix, (v) => (state.numberPrefix = v.toUpperCase()), { maxlength: 8, class: 'mono short' }), 'z. B. APP → APP-0001'),
-      ),
       el(
         'div',
         { class: 'row' },
@@ -471,7 +448,14 @@
     errorsBox.hidden = true;
     saveButton.disabled = true;
     const payload = structuredClone(state);
-    payload.questions = payload.questions.map(({ _new, _keyTouched, ...q }) => q);
+    // Interne Schlüssel automatisch: bestehende bleiben, neue kommen aus dem Fragetext
+    const used = new Set();
+    payload.questions = payload.questions.map(({ _new, _keyTouched, ...q }) => {
+      let key = /^[a-z0-9_]{1,32}$/.test(q.key ?? '') && !used.has(q.key) ? q.key : slug(q.label || 'frage', 28) || 'frage';
+      for (let n = 2; used.has(key); n++) key = `${key.replace(/_\d+$/, '').slice(0, 28)}_${n}`;
+      used.add(key);
+      return { ...q, key };
+    });
     try {
       const res = await fetch(root.dataset.save, {
         method: 'POST',

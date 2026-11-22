@@ -233,9 +233,6 @@ const builder = new SlashCommandBuilder()
           .setAutocomplete(true),
       )
       .addBooleanOption((o) => o.setName('aktiv').setDescription('Bewerbungen annehmen?'))
-      .addStringOption((o) =>
-        o.setName('panel').setDescription('In welchem Panel?').addChoices({ name: 'Bewerbungs-Panel', value: 'apply' }, { name: 'Qualifikations-Panel', value: 'quali' }),
-      )
       .addChannelOption((o) => o.setName('kanal_offen').setDescription('Hier landen neue Bewerbungen').addChannelTypes(ChannelType.GuildText))
       .addChannelOption((o) => o.setName('kanal_angenommen').setDescription('Kopie angenommener Bewerbungen').addChannelTypes(ChannelType.GuildText))
       .addChannelOption((o) => o.setName('kanal_abgelehnt').setDescription('Kopie abgelehnter Bewerbungen').addChannelTypes(ChannelType.GuildText))
@@ -372,7 +369,6 @@ function changesFor(interaction, sub) {
       changes.push(
         ...collect(interaction, [
           ['aktiv', `${base}.enabled`, 'getBoolean'],
-          ['panel', `${base}.panel`, 'getString'],
           ['kanal_offen', `${base}.channels.open`, 'getChannel', (c) => c.id],
           ['kanal_angenommen', `${base}.channels.accepted`, 'getChannel', (c) => c.id],
           ['kanal_abgelehnt', `${base}.channels.rejected`, 'getChannel', (c) => c.id],

@@ -90,8 +90,10 @@ Konsole:
 
 - Bewerbungen und Panels, die im Dashboard angelegt werden, gelten nur für diesen Server und stehen in `data/db.json`.
   `/einstellungen zuruecksetzen` lässt sie stehen.
-- Die beiden alten Panels (`/bewerbungspanel`, `/qualipanel`) gibt es weiter; im Dashboard heißen sie
-  „Bewerbungs-Panel“ und „Qualifikations-Panel“ und können nicht gelöscht werden.
+- Es gibt keine vorgefertigten Bewerbungen oder Panels – alles legst du selbst an. Ein Panel kannst du auch in Discord
+  mit `/bewerbungspanel panel:<Name>` posten.
+- Schlüssel und Nummern-Präfix einer Bewerbung werden automatisch aus dem Namen gebildet (z. B. „Polizei-Bewerbung“ →
+  Nummern `POLI-0001`).
 - Neue Bewerbungen erscheinen erst in einem Panel, wenn du sie dort verknüpfst. Über `/bewerbung` sind sie sofort
   erreichbar.
 - Höchstens 25 Bewerbungen und 25 Panels je Server (Grenze der Discord-Auswahlmenüs).

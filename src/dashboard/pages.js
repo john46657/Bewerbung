@@ -401,11 +401,12 @@ function panelsList({ ctx, panels, channelName }) {
     title: 'Panels',
     body: html`<div class="page-head"><h1>Panels</h1><a class="btn btn-primary" href="/g/${guild.id}/panels/neu">+ Neues Panel</a></div>
 <p class="muted">Ein Panel ist die Nachricht in Discord, über die sich Mitglieder bewerben. Wähle, welche Bewerbungen hineinkommen, gestalte es und sende es in einen Kanal. Bereits gesendete Panels aktualisieren sich beim Speichern automatisch.</p>
+${panels.length ? '' : html`<div class="empty"><p>Noch keine Panels.</p><a class="btn btn-primary" href="/g/${guild.id}/panels/neu">Erstes Panel anlegen</a></div>`}
 <div class="panel-grid">${panels.map(
       (p) => html`<div class="card panel-card">
   <span class="panel-accent" data-color="${p.color ?? ''}"></span>
   <h2>${p.title}</h2>
-  <p class="muted">${p.name}</p>
+  ${p.name ? html`<p class="muted">${p.name}</p>` : ''}
   <dl class="facts">
     <dt>Kanal</dt><dd>${p.channel ? `#${channelName(p.channel)}` : '—'}</dd>
     <dt>Bewerbungen</dt><dd>${p.typeNames.length ? p.typeNames.join(', ') : html`<span class="muted">keine</span>`}</dd>
@@ -413,11 +414,7 @@ function panelsList({ ctx, panels, channelName }) {
   </dl>
   <div class="card-actions">
     <a class="btn btn-sm" href="/g/${guild.id}/panels/${p.id}">Bearbeiten</a>
-    ${
-      p.builtIn
-        ? ''
-        : html`<form method="post" action="/g/${guild.id}/panels/${p.id}/loeschen"><input type="hidden" name="csrf" value="${session.csrf}"><button class="btn btn-sm btn-ghost" data-confirm="Panel „${p.title}“ löschen? Bereits gesendete Nachrichten bleiben stehen, werden aber nicht mehr aktualisiert.">Löschen</button></form>`
-    }
+    <form method="post" action="/g/${guild.id}/panels/${p.id}/loeschen"><input type="hidden" name="csrf" value="${session.csrf}"><button class="btn btn-sm btn-ghost" data-confirm="Panel „${p.title}“ löschen? Bereits gesendete Nachrichten bleiben stehen, werden aber nicht mehr aktualisiert.">Löschen</button></form>
   </div>
 </div>`,
     )}</div>`,

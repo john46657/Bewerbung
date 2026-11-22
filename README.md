@@ -145,7 +145,7 @@ Auf **jedem** Server, auf dem der Bot läuft:
 
 1. Mit `/einstellungen kanal` und `/einstellungen rolle` Kanäle und Rollen festlegen.
 2. `/ticket panel` im Support-Kanal ausführen.
-3. `/bewerbungspanel` und `/qualipanel` in den Bewerbungs-Kanälen ausführen (Einrichtung: [docs/applications.md](docs/applications.md#14-schnellstart)).
+3. Im Dashboard Bewerbungen und Panels anlegen und das Panel in den Kanal senden (Einrichtung: [docs/dashboard.md](docs/dashboard.md)).
 4. Optional `/rollenpanel` für selbst wählbare Rollen.
 
 ## Projektstruktur
