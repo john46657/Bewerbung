@@ -14,8 +14,10 @@ module.exports = {
       o
         .setName('art')
         .setDescription('Wofür möchtest du dich bewerben?')
-        .addChoices(...store.baseTypes().slice(0, 25).map((t) => ({ name: t.name, value: t.id }))),
+        .setAutocomplete(true),
     ),
+
+  autocomplete: (interaction) => store.typeSuggestions(interaction),
 
   async execute(interaction) {
     const types = store.types(interaction.guildId);
@@ -32,7 +34,8 @@ module.exports = {
           await flow.offer(interaction, interaction.values[0]);
           // Auswahl im Panel zurücksetzen
           const panel = bucket('appPanels', interaction.guildId)[interaction.message.id];
-          if (panel) await interaction.message.edit(buildPanel(interaction.guildId, panel.kind)).catch(() => {});
+          const payload = panel && buildPanel(interaction.guildId, panel.kind);
+          if (payload) await interaction.message.edit(payload).catch(() => {});
           return;
         }
         case 'apply':

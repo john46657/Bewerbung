@@ -186,4 +186,21 @@ async function handleMemberLeave(member) {
   }
 }
 
-module.exports = { decide, askReason, changeStatus, withdraw, showHistory, openTicket, handleMemberLeave, updateTeamMessage };
+// Entscheidung aus dem Dashboard: status ACCEPTED, REJECTED oder ein Zwischenschritt der Polizei-Bewerbung.
+// Gibt eine Fehlermeldung zurück oder null.
+async function decideFromDashboard(guild, record, type, user, status, reason = null) {
+  if (record.userId === user.id) return 'Über deine eigene Bewerbung kannst du nicht entscheiden.';
+  const final = ['ACCEPTED', 'REJECTED'].includes(status);
+  if (!final && !(type.workflow === 'police' && (store.POLICE_TRANSITIONS[record.status] ?? []).includes(status))) {
+    return `Von „${store.STATUS[record.status]}“ geht es nicht nach „${store.STATUS[status] ?? status}“.`;
+  }
+  if (status === 'WITHDRAWN') reason ??= 'Vom Team zurückgezogen.';
+  if (!store.setStatus(record, status, user.id, { reason: final || status === 'WITHDRAWN' ? reason : undefined })) {
+    return `Diese Bewerbung wurde bereits entschieden: ${store.STATUS[record.status]}.`;
+  }
+  await updateTeamMessage(guild, record, type);
+  if (store.FINAL.includes(status)) await afterDecision(guild, record, type, user);
+  return null;
+}
+
+module.exports = { decideFromDashboard, decide, askReason, changeStatus, withdraw, showHistory, openTicket, handleMemberLeave, updateTeamMessage };

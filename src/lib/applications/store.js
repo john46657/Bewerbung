@@ -82,6 +82,12 @@ function isManager(member, type) {
   if (!member) return false;
   return isStaff(member) || type.roles.managers.some((id) => member.roles.cache.has(id));
 }
+// Vorschläge für Befehlsoptionen „art“ (Autovervollständigung, je Server). extra: zusätzliche Einträge vorneweg.
+function typeSuggestions(interaction, extra = []) {
+  const query = String(interaction.options.getFocused() ?? '').toLowerCase();
+  const list = [...extra, ...types(interaction.guildId).map((t) => ({ name: t.name, value: t.id }))];
+  return interaction.respond(list.filter((c) => c.name.toLowerCase().includes(query) || c.value.includes(query)).slice(0, 25).map((c) => ({ name: c.name.slice(0, 100), value: c.value })));
+}
 const managesAny = (member) => types(member.guild.id).some((t) => isManager(member, t));
 
 // ---------- Sperren ----------
@@ -159,6 +165,7 @@ module.exports = {
   types,
   typeById,
   baseTypes,
+  typeSuggestions,
   isOpenStatus,
   recordsOf,
   bansOf,

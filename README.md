@@ -14,6 +14,7 @@ jeder Server hat seine eigenen Kanäle, Rollen, Tickets, Bewerbungen, Verwarnung
 | 🛡️ **Moderation** | `/kick` `/ban` `/unban` `/timeout` `/warn` `/verwarnungen anzeigen\|loeschen` `/clear` · Rollen-Hierarchie wird geprüft · DM an Betroffene · Mod-Log |
 | 🎫 **Tickets** | Panel mit Kategorien, **Live-Auslastung** und Banner · Öffnungszeiten · Limit pro Nutzer · Kanalnamen mit Platzhaltern · Übernehmen/Freigeben · Schließen mit Rückfrage und optionalem Grund · Claim-Kategorie · Auto-Team-Alert & Auto-Unclaim · Personen-Anfragen durch Ersteller · Aktivitäts-Log & Transkripte |
 | 🎉 **Community** | Willkommensnachricht + Auto-Rolle · `/rollenpanel` (Rollen per Button) · `/umfrage` (native Discord-Umfragen) · Level-System mit `/rang`, `/bestenliste` und Rollen-Belohnungen |
+| 🌐 **Dashboard** | Anmeldung mit Discord · Bewerbungen mit eigenen Fragen bauen · Panels gestalten (Vorschau) und senden · Eingänge prüfen und entscheiden – **Einrichtung in [docs/dashboard.md](docs/dashboard.md)** |
 | ⚙️ **Verwaltung** | `/einstellungen`: Kanäle, Rollen, Tickets, Öffnungszeiten, Level und FiveM direkt in Discord ändern, ohne Neustart – je Server getrennt |
 | 📖 | `/hilfe` zeigt alle Befehle |
 
@@ -38,6 +39,8 @@ jeder Server hat seine eigenen Kanäle, Rollen, Tickets, Bewerbungen, Verwarnung
 ```env
 DISCORD_TOKEN=dein-bot-token
 ```
+
+Für das **Dashboard** kommen `DASHBOARD_URL` und `DISCORD_CLIENT_SECRET` dazu (optional) – siehe [docs/dashboard.md](docs/dashboard.md).
 
 `GUILD_ID` brauchst du nicht mehr. Nur wenn der Bot schon vor dem Mehr-Server-Update lief und inzwischen auf
 mehreren Servern ist, trägst du dort die ID des alten Servers ein, damit dessen `/einstellungen`-Änderungen

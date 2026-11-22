@@ -51,6 +51,9 @@ for (const file of fs.readdirSync(path.join(__dirname, 'src', 'events'))) {
   );
 }
 
+// Web-Dashboard (startet nur, wenn DASHBOARD_URL und DISCORD_CLIENT_SECRET gesetzt sind)
+require('./src/dashboard').start(client);
+
 process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
 
 client.login(process.env.DISCORD_TOKEN).catch((err) => {

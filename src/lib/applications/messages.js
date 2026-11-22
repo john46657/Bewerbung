@@ -23,22 +23,34 @@ const unix = (ms) => Math.floor(ms / 1000);
 
 // ---------- Panels ----------
 
+// Ein Panel legt mit `types` (Liste von IDs) selbst fest, welche Bewerbungen es zeigt (Dashboard).
+// Ohne `types` gilt wie früher: alle Arten mit passendem `panel` ("apply" / "quali").
 function panelTypes(guildId, kind) {
+  const panel = forGuild(guildId).applications.panels[kind];
+  if (Array.isArray(panel?.types)) return panel.types.map((id) => store.typeById(guildId, id)).filter(Boolean);
   return store.types(guildId).filter((t) => t.panel === kind);
+}
+
+const DEFAULT_PLACEHOLDER = { apply: 'Wofür möchtest du dich bewerben?', quali: 'Wähle eine Einheit oder Qualifikation …' };
+
+function accent(panel) {
+  const color = /^#[0-9a-f]{6}$/i.test(panel.color ?? '') ? panel.color : base.colors.primary;
+  return parseInt(color.slice(1), 16);
 }
 
 function buildPanel(guildId, kind) {
   const panel = forGuild(guildId).applications.panels[kind];
+  if (!panel) return null;
   const list = panelTypes(guildId, kind);
   const container = new ContainerBuilder()
-    .setAccentColor(parseInt(base.colors.primary.slice(1), 16))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${panel.title}\n${panel.description}`));
+    .setAccentColor(accent(panel))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${panel.title}${panel.description ? `\n${panel.description}` : ''}`));
 
-  if (list.length > 1 || kind === 'quali') {
+  if (list.length > 1 || kind === 'quali' || !list.length) {
     container.addSeparatorComponents(new SeparatorBuilder()).addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         list.length
-          ? list.map((t) => `- [${t.emoji}] **${t.name}**${t.enabled ? '' : ' *(geschlossen)*'}\n${t.description || ''}`).join('\n\n')
+          ? list.map((t) => `- [${t.emoji}] **${t.name}**${t.enabled ? '' : ' *(geschlossen)*'}${t.description ? `\n${t.description}` : ''}`).join('\n\n')
           : '*Derzeit gibt es hier keine Bewerbungen.*',
       ),
     );
@@ -51,7 +63,11 @@ function buildPanel(guildId, kind) {
   if (list.length === 1) {
     components.push(
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`quali:apply:${list[0].id}`).setLabel('Jetzt bewerben').setStyle(ButtonStyle.Primary).setEmoji(list[0].emoji),
+        new ButtonBuilder()
+          .setCustomId(`quali:apply:${list[0].id}`)
+          .setLabel(truncate(panel.buttonLabel || 'Jetzt bewerben', 80))
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji(list[0].emoji),
       ),
     );
   } else if (list.length > 1) {
@@ -59,7 +75,7 @@ function buildPanel(guildId, kind) {
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId('quali:pick')
-          .setPlaceholder(kind === 'apply' ? 'Wofür möchtest du dich bewerben?' : 'Wähle eine Einheit oder Qualifikation …')
+          .setPlaceholder(truncate(panel.placeholder || DEFAULT_PLACEHOLDER[kind] || 'Wofür möchtest du dich bewerben?', 150))
           .addOptions(list.slice(0, 25).map((t) => ({ label: t.name, value: t.id, emoji: t.emoji, description: truncate(t.description || t.name, 100) }))),
       ),
     );
@@ -68,21 +84,26 @@ function buildPanel(guildId, kind) {
 }
 
 async function postPanel(channel, kind) {
-  const message = await channel.send(buildPanel(channel.guild.id, kind));
+  const payload = buildPanel(channel.guild.id, kind);
+  if (!payload) throw new Error(`Panel ${kind} gibt es nicht.`);
+  const message = await channel.send(payload);
   bucket('appPanels', channel.guild.id)[message.id] = { channelId: channel.id, kind };
   save();
+  return message;
 }
 
 async function refreshPanels(guild) {
   const panels = bucket('appPanels', guild.id);
   for (const [messageId, { channelId, kind }] of Object.entries(panels)) {
-    const message = await guild.channels.cache.get(channelId)?.messages.fetch(messageId).catch(() => null);
+    const payload = buildPanel(guild.id, kind);
+    const message = payload && (await guild.channels.cache.get(channelId)?.messages.fetch(messageId).catch(() => null));
     if (!message) {
+      // Nachricht gelöscht oder Panel im Dashboard entfernt: nicht mehr verfolgen.
       delete panels[messageId];
       save();
       continue;
     }
-    await message.edit(buildPanel(guild.id, kind)).catch((err) => console.error('[appPanel]', err.message));
+    await message.edit(payload).catch((err) => console.error('[appPanel]', err.message));
   }
 }
 
@@ -218,4 +239,4 @@ function buildTeamMessage(record, type, { withFile = false, components = true } 
   return message;
 }
 
-module.exports = { buildPanel, postPanel, refreshPanels, buildTeamMessage, answersFile, formatDuration };
+module.exports = { panelTypes, buildPanel, postPanel, refreshPanels, buildTeamMessage, answersFile, formatDuration };

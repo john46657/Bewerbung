@@ -230,7 +230,7 @@ const builder = new SlashCommandBuilder()
           .setName('art')
           .setDescription('Welche Bewerbung?')
           .setRequired(true)
-          .addChoices(...settings.base.applications.types.slice(0, 25).map((t) => ({ name: t.name, value: t.id }))),
+          .setAutocomplete(true),
       )
       .addBooleanOption((o) => o.setName('aktiv').setDescription('Bewerbungen annehmen?'))
       .addStringOption((o) =>
@@ -420,6 +420,8 @@ module.exports = {
   data: builder,
   parsePeriods,
 
+  autocomplete: (interaction) => require('../../lib/applications/store').typeSuggestions(interaction),
+
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     if (sub === 'anzeigen') return replyPrivate(interaction, { embeds: [overview(interaction.guild)] });
@@ -427,7 +429,7 @@ module.exports = {
     if (sub === 'zuruecksetzen') {
       if (!interaction.options.getBoolean('bestaetigen')) return replyPrivate(interaction, 'Abgebrochen.');
       settings.reset(interaction.guildId);
-      await replyPrivate(interaction, '♻️ Alle Einstellungen dieses Servers kommen jetzt wieder aus der config.json.');
+      await replyPrivate(interaction, '♻️ Alle Einstellungen dieses Servers kommen jetzt wieder aus der config.json. Im Dashboard angelegte Bewerbungen und Panels bleiben erhalten.');
       await appMessages.refreshPanels(interaction.guild);
       return refreshPanels(interaction.guild);
     }

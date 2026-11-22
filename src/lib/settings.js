@@ -78,9 +78,35 @@ function set(guildId, path, value) {
   db.save();
 }
 
+// Ersetzt alle Bewerbungsarten eines Servers (Dashboard). Ältere Einzeländerungen an den Arten werden dabei
+// verworfen, damit sie die neue Liste nach einem Neustart nicht wieder überschreiben.
+function setApplicationTypes(guildId, types) {
+  const own = (overrides[guildId] ??= {});
+  for (const key of Object.keys(own)) {
+    if (key === 'applications.types' || key.startsWith('applications.types.')) delete own[key];
+  }
+  own['applications.types'] = structuredClone(types);
+  forGuild(guildId).applications.types = structuredClone(types);
+  db.save();
+}
+
+// Ersetzt alle Bewerbungs-Panels eines Servers (Dashboard), wie setApplicationTypes.
+function setApplicationPanels(guildId, panels) {
+  const own = (overrides[guildId] ??= {});
+  for (const key of Object.keys(own)) {
+    if (key === 'applications.panels' || key.startsWith('applications.panels.')) delete own[key];
+  }
+  own['applications.panels'] = structuredClone(panels);
+  forGuild(guildId).applications.panels = structuredClone(panels);
+  db.save();
+}
+
 // Alle Änderungen eines Servers verwerfen und wieder die Werte aus config.json verwenden.
+// Im Dashboard angelegte Bewerbungsarten und Panels bleiben erhalten.
 function reset(guildId) {
+  const kept = Object.fromEntries(['applications.types', 'applications.panels'].filter((key) => overrides[guildId]?.[key]).map((key) => [key, overrides[guildId][key]]));
   delete overrides[guildId];
+  if (Object.keys(kept).length) overrides[guildId] = kept;
   configs.delete(guildId);
   db.save();
 }
@@ -91,6 +117,8 @@ module.exports = {
   get,
   set,
   reset,
+  setApplicationTypes,
+  setApplicationPanels,
   adoptLegacy,
   hasLegacy: () => Boolean(overrides._legacy),
   overrideCount: (guildId) => Object.keys(overrides[guildId] ?? {}).length,
