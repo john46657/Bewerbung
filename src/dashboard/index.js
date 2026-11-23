@@ -216,7 +216,7 @@ function start(client) {
     for (const r of store.openOf(guild.id)) openCounts[r.type] = (openCounts[r.type] ?? 0) + 1;
     const panels = panelEntries(guild);
     const panelsOf = (typeId) => panels.filter((p) => p.types.includes(typeId)).map((p) => p.title);
-    send(res, pages.typesList({ ctx: req.ctx, types: store.types(guild.id), openCounts, panelsOf, channels: textChannels(guild) }));
+    send(res, pages.typesList({ ctx: req.ctx, types: store.types(guild.id), openCounts, panelsOf }));
   });
 
   guildRouter.post('/formulare/kanal', requireManage, (req, res) => {

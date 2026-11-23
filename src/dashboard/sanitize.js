@@ -68,6 +68,7 @@ function sanitizeType(input, { guild, defaults, existingId, takenIds }) {
   };
 
   if (!type.name) errors.push('Gib der Bewerbung einen Namen.');
+  if (!type.channels.open) errors.push('Wähle den Kanal für ausstehende Bewerbungen.');
   if (!EMOJI.test(type.emoji)) errors.push('Das Emoji muss ein einzelnes Emoji sein (z. B. 👮) oder ein Server-Emoji wie <:name:123…>.');
   if (!/^[A-Z0-9]{1,8}$/.test(type.numberPrefix)) errors.push('Das Nummern-Präfix darf nur A–Z und 0–9 enthalten (1–8 Zeichen).');
 

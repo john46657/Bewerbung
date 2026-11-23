@@ -44,6 +44,7 @@ function layout({ title, session, body, wide = false }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title ? `${title} · ` : ''}${SERVER_NAME()} Dashboard</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/ui.js" defer></script>
 <script src="/static/app.js" defer></script>
 <script src="/static/panel.js" defer></script>
 </head>
@@ -136,12 +137,12 @@ ${invite.length ? html`<h2>Bot noch nicht dabei</h2><div class="guild-grid">${in
 // ---------- Server-Bereich ----------
 
 function guildLayout({ session, guild, member, perms, active, title, body, query = {} }) {
-  const nav = [
-    ['overview', `/g/${guild.id}`, 'Übersicht', true],
-    ['types', `/g/${guild.id}/formulare`, 'Bewerbungen', perms.manage],
+  const sub = [
+    ['types', `/g/${guild.id}/formulare`, 'Bewerbungsformulare', perms.manage],
     ['panels', `/g/${guild.id}/panels`, 'Panels', perms.manage],
     ['records', `/g/${guild.id}/eingaenge`, 'Eingänge', perms.review],
   ].filter(([, , , show]) => show);
+  const link = ([key, href, label]) => html`<a href="${href}" class="${key === active ? 'active' : ''}">${label}</a>`;
   const icon = guild.iconURL({ size: 64 });
   return layout({
     title,
@@ -153,7 +154,10 @@ function guildLayout({ session, guild, member, perms, active, title, body, query
     ${icon ? html`<img src="${icon}" alt="" width="40" height="40">` : html`<span class="guild-fallback guild-fallback-sm">${initials(guild.name)}</span>`}
     <span><strong>${guild.name}</strong><small>Server wechseln</small></span>
   </a>
-  <nav>${nav.map(([key, href, label]) => html`<a href="${href}" class="${key === active ? 'active' : ''}">${label}</a>`)}</nav>
+  <nav>
+    ${link(['overview', `/g/${guild.id}`, 'Übersicht'])}
+    ${sub.length ? html`<span class="nav-group">Bewerbungen</span><div class="nav-sub">${sub.map(link)}</div>` : ''}
+  </nav>
   <p class="sidebar-role">Angemeldet als ${member.displayName}${perms.manage ? ' · Verwaltung' : perms.review ? ' · Team' : ''}</p>
 </aside>
 <section class="content">${notice(query)}${body}</section>
@@ -349,33 +353,50 @@ ${r.reason ? html`<div class="notice notice-muted"><strong>Grund:</strong> ${r.r
   });
 }
 
-function typesList({ ctx, types, openCounts, panelsOf, channels }) {
-  const { guild, session, config } = ctx;
-  const channelSelect = (name, selected) =>
-    html`<select name="${name}"><option value="">— nicht gesetzt —</option>${channels.map((c) => html`<option value="${c.id}" ${c.id === selected ? raw('selected') : ''}>#${c.name}</option>`)}</select>`;
+function typesList({ ctx, types, openCounts, panelsOf }) {
+  const { guild, session } = ctx;
   return guildLayout({
     ...ctx,
     active: 'types',
-    title: 'Bewerbungen',
-    body: html`<div class="page-head"><h1>Bewerbungen <span class="muted">${types.length}/25</span></h1>${types.length < 25 ? html`<a class="btn btn-primary" href="/g/${guild.id}/formulare/neu">+ Neue Bewerbung</a>` : ''}</div>
+    title: 'Bewerbungsformulare',
+    body: html`<div class="intro-grid">
+  <div class="card intro-card">
+    <h2>Erste Schritte</h2>
+    <ol class="intro-steps">
+      <li>Lege eine neue Bewerbung an und gib ihr einen Namen.</li>
+      <li>Öffne sie über „Bearbeiten“.</li>
+      <li>Stelle Fragen, Kanäle, Nachrichten und Rollen ein.</li>
+      <li>Mitglieder nutzen <code>/bewerbung</code> – oder du baust ein <a href="/g/${guild.id}/panels">Bewerbungs-Panel</a>.</li>
+    </ol>
+  </div>
+  <div class="card intro-card">
+    <h2>Funktionen</h2>
+    <div class="feature-grid">
+      <span class="feature">Mehrere Bewerbungen anlegen und verwalten</span>
+      <span class="feature">Fragen per DM oder auf der Website</span>
+      <span class="feature">Rollen automatisch geben und nehmen</span>
+      <span class="feature">Annehmen und ablehnen in Discord oder hier</span>
+    </div>
+  </div>
+</div>
+<div class="card list-bar">
+  <h2>Bewerbungen: <span class="muted">${types.length}/25</span></h2>
+  <input type="search" class="grow" placeholder="Bewerbungen suchen …" data-filter=".type-row" aria-label="Bewerbungen suchen">
+  ${types.length < 25 ? html`<a class="btn btn-primary" href="/g/${guild.id}/formulare/neu">+ Neue Bewerbung</a>` : ''}
+</div>
 ${
   types.length
-    ? html`<div class="card"><ul class="type-list type-list-big">${types.map(
-        (t) => html`<li>
+    ? html`<div class="type-rows">${types.map(
+        (t) => html`<div class="card type-row" data-search="${t.name.toLowerCase()}">
   <span class="type-emoji">${t.emoji}</span>
-  <span class="grow"><strong>${t.name}</strong><small>${t.questions.length} ${t.questions.length === 1 ? 'Frage' : 'Fragen'} · ${t.workflow === 'police' ? 'mit Prüfschritten' : 'einfach'} · ${panelsOf(t.id).length ? `im Panel: ${panelsOf(t.id).join(', ')}` : 'in keinem Panel'}${openCounts[t.id] ? ` · ${openCounts[t.id]} offen` : ''}</small></span>
+  <span class="grow"><strong>${t.name}</strong><small>${t.questions.length} ${t.questions.length === 1 ? 'Frage' : 'Fragen'} · ${t.mode === 'DM_WEB' ? 'DM und Website' : 'Direktnachricht'} · ${panelsOf(t.id).length ? `im Panel: ${panelsOf(t.id).join(', ')}` : 'in keinem Panel'}${openCounts[t.id] ? ` · ${openCounts[t.id]} offen` : ''}</small></span>
   ${t.enabled ? badge('offen', 'good') : badge('geschlossen', 'muted')}
   <a class="btn btn-sm" href="/g/${guild.id}/formulare/${t.id}">Bearbeiten</a>
   <form method="post" action="/g/${guild.id}/formulare/${t.id}/loeschen"><input type="hidden" name="csrf" value="${session.csrf}"><button class="btn btn-sm btn-ghost" data-confirm="„${t.name}“ wirklich löschen? Die Fragen und Einstellungen gehen verloren.">Löschen</button></form>
-</li>`,
-      )}</ul></div>`
-    : html`<div class="empty"><p>Noch keine Bewerbungen.</p><a class="btn btn-primary" href="/g/${guild.id}/formulare/neu">Erste Bewerbung anlegen</a></div>`
-}
-<form method="post" action="/g/${guild.id}/formulare/kanal" class="card inline-form">
-  <input type="hidden" name="csrf" value="${session.csrf}">
-  <label class="grow">Standard-Kanal für eingehende Bewerbungen <small class="hint">Hier landen neue Bewerbungen fürs Team, wenn bei der Bewerbung kein eigener Kanal gesetzt ist.</small>${channelSelect('channel', config.applications.channel)}</label>
-  <button class="btn">Speichern</button>
-</form>`,
+</div>`,
+      )}</div>`
+    : ''
+}`,
   });
 }
 
@@ -385,9 +406,7 @@ function typeEditor({ ctx, type, isNew, roles, channels, defaults, webBase }) {
     ...ctx,
     active: 'types',
     title: isNew ? 'Neue Bewerbung' : type.name,
-    body: html`<a class="back" href="/g/${guild.id}/formulare">← Alle Bewerbungen</a>
-<h1>${isNew ? 'Neue Bewerbung' : html`${type.emoji} ${type.name}`}</h1>
-<div id="editor" data-save="/g/${guild.id}/formulare/${isNew ? 'neu' : type.id}" data-csrf="${session.csrf}" data-back="/g/${guild.id}/formulare" data-new="${isNew ? '1' : ''}"><p class="muted">Editor wird geladen …</p></div>
+    body: html`<div id="editor" data-save="/g/${guild.id}/formulare/${isNew ? 'neu' : type.id}" data-csrf="${session.csrf}" data-back="/g/${guild.id}/formulare" data-new="${isNew ? '1' : ''}"><p class="muted">Editor wird geladen …</p></div>
 <script type="application/json" id="editor-data">${json({ type, roles, channels, defaults, webBase })}</script>
 <noscript><div class="notice notice-bad">Für den Editor muss JavaScript aktiviert sein.</div></noscript>`,
   });
@@ -427,8 +446,7 @@ function panelEditor({ ctx, panel, isNew, types, channels, defaultColor }) {
     ...ctx,
     active: 'panels',
     title: isNew ? 'Neues Panel' : panel.title,
-    body: html`<a class="back" href="/g/${guild.id}/panels">← Alle Panels</a>
-<div id="panel-editor" data-save="/g/${guild.id}/panels/${isNew ? 'neu' : panel.id}" data-csrf="${session.csrf}" data-guild="${guild.id}" data-new="${isNew ? '1' : ''}"><p class="muted">Editor wird geladen …</p></div>
+    body: html`<div id="panel-editor" data-save="/g/${guild.id}/panels/${isNew ? 'neu' : panel.id}" data-csrf="${session.csrf}" data-back="/g/${guild.id}/panels" data-guild="${guild.id}" data-new="${isNew ? '1' : ''}"><p class="muted">Editor wird geladen …</p></div>
 <script type="application/json" id="panel-data">${json({ panel, types, channels, defaultColor, serverName: guild.name })}</script>
 <noscript><div class="notice notice-bad">Für den Editor muss JavaScript aktiviert sein.</div></noscript>`,
   });
